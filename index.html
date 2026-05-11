@@ -267,17 +267,36 @@
             justify-content: space-between;
         }
 
-        .skill-item {
-            display: flex; align-items: flex-start; gap: 8px;
-            padding: 9px 11px; background: var(--bg);
-            border-radius: 9px; margin-bottom: 5px;
-            border-left: 3px solid var(--warning);
+        .skill-notes-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            padding: 4px 2px;
         }
-        .skill-item.high { border-color: var(--danger); }
-        .skill-item.medium { border-color: var(--warning); }
-        .skill-item.low { border-color: var(--success); }
-        .skill-name { font-size: 13px; font-weight: 500; flex: 1; line-height: 1.4; }
-        .skill-pri { font-size: 11px; color: var(--sub); margin-top: 1px; }
+        .skill-item {
+            background: #fef9c3;
+            border-radius: 3px;
+            box-shadow: 2px 3px 8px rgba(0,0,0,0.13), 0 1px 2px rgba(0,0,0,0.08);
+            padding: 12px 10px 24px;
+            position: relative;
+            cursor: pointer;
+            min-height: 80px;
+            transition: box-shadow 0.15s, transform 0.15s;
+        }
+        .skill-item:hover { box-shadow: 3px 5px 14px rgba(0,0,0,0.18); transform: translateY(-1px); }
+        .skill-item:nth-child(3n+1) { background: #fef9c3; }
+        .skill-item:nth-child(3n+2) { background: #d1fae5; }
+        .skill-item:nth-child(3n+3) { background: #fce7f3; }
+        .skill-name {
+            font-size: 13px; font-weight: 400; line-height: 1.6;
+            color: #333; white-space: pre-wrap; word-break: break-word;
+            font-family: inherit;
+        }
+        .skill-item .ghost-del {
+            position: absolute; bottom: 6px; right: 6px;
+            opacity: 0; font-size: 14px; color: #999;
+        }
+        .skill-item:hover .ghost-del { opacity: 1; }
 
         .reminder-item {
             display: flex; align-items: flex-start; gap: 8px;
@@ -518,22 +537,14 @@
 
 <!-- Skill modal -->
 <div class="overlay" id="skillModal">
-    <div class="modal">
-        <h3 id="skillModalTitle">添加需补足能力</h3>
-        <div class="fg">
-            <label>能力名称 *</label>
-            <input id="sk_name" type="text" placeholder="例如：数据分析、客户谈判...">
-            <div class="err" id="sk_name_err">请输入能力名称</div>
+    <div class="modal" style="background:transparent;box-shadow:none;padding:0;width:340px">
+        <div id="sk_sticky_wrap" style="background:#fef9c3;border-radius:3px;box-shadow:3px 5px 16px rgba(0,0,0,0.22);padding:16px 16px 48px;position:relative;min-height:160px;">
+            <textarea id="sk_name" rows="6"
+                style="width:100%;border:none;background:transparent;resize:none;font-size:14px;font-family:inherit;line-height:1.7;color:#333;outline:none;padding:0;"
+                placeholder=""></textarea>
+            <div class="err" id="sk_name_err" style="position:absolute;bottom:28px;left:16px;">请输入内容</div>
         </div>
-        <div class="fg">
-            <label>优先级</label>
-            <select id="sk_pri">
-                <option value="high">高 — 急需提升</option>
-                <option value="medium">中 — 需要关注</option>
-                <option value="low">低 — 长期培养</option>
-            </select>
-        </div>
-        <div class="modal-foot">
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">
             <button class="btn btn-secondary" onclick="closeModal('skillModal')">取消</button>
             <button class="btn btn-primary" onclick="saveSkill()">保存</button>
         </div>
@@ -987,22 +998,24 @@ function deleteTodo(taskId, bsId, tdId) {
 function openSkillModal(id) {
     editSkillId = id;
     const s = id ? db.skills.find(x=>x.id===id) : null;
-    document.getElementById('skillModalTitle').textContent = s ? '编辑能力' : '添加需补足能力';
+    // 便签颜色随机
+    const colors = ['#fef9c3','#d1fae5','#fce7f3','#dbeafe','#ffe4c4'];
+    const col = colors[Math.floor(Math.random()*colors.length)];
+    document.getElementById('sk_sticky_wrap').style.background = col;
     document.getElementById('sk_name').value = s ? s.title : '';
-    document.getElementById('sk_pri').value = s ? s.priority : 'high';
     hideErr('sk_name_err'); showOverlay('skillModal');
-    setTimeout(() => document.getElementById('sk_name').focus(), 100);
+    setTimeout(() => document.getElementById('sk_name').focus(), 80);
 }
 function saveSkill() {
     const name = document.getElementById('sk_name').value.trim();
     if (!name) { showErr('sk_name_err'); document.getElementById('sk_name').focus(); return; }
     hideErr('sk_name_err');
-    const pri = document.getElementById('sk_pri').value;
+    const color = document.getElementById('sk_sticky_wrap').style.background || '#fef9c3';
     if (editSkillId) {
         const s = db.skills.find(x=>x.id===editSkillId);
-        if (s) { s.title=name; s.priority=pri; }
+        if (s) { s.title=name; s.color=color; }
     } else {
-        db.skills.push({ id:uid(), title:name, priority:pri });
+        db.skills.push({ id:uid(), title:name, color });
     }
     save(); closeModal('skillModal'); renderSkills();
 }
@@ -1013,15 +1026,14 @@ function deleteSkill(id) {
 function renderSkills() {
     const el = document.getElementById('skillList');
     if (!db.skills.length) { el.innerHTML='<div class="empty-hint">暂无记录</div>'; return; }
-    const lbl = { high:'高', medium:'中', low:'低' };
-    el.innerHTML = db.skills.map(s=>`
-        <div class="skill-item ${s.priority}">
-            <div style="flex:1;min-width:0">
-                <div class="skill-name">${esc(s.title)}</div>
-                <div class="skill-pri">优先级：${lbl[s.priority]}</div>
-            </div>
-            <button class="ghost-del" onclick="deleteSkill('${s.id}')">×</button>
-        </div>`).join('');
+    el.innerHTML = `<div class="skill-notes-grid">` + db.skills.map(s=>{
+        const col = s.color || '#fef9c3';
+        return `
+        <div class="skill-item" style="background:${col}" onclick="openSkillModal('${s.id}')">
+            <div class="skill-name">${esc(s.title)}</div>
+            <button class="ghost-del" onclick="event.stopPropagation();deleteSkill('${s.id}')">×</button>
+        </div>`;
+    }).join('') + `</div>`;
 }
 
 // ── Reminders ──
