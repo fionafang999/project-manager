@@ -380,7 +380,12 @@
         .prog-entry-date { color: var(--accent); font-weight: 600; flex-shrink: 0; white-space: nowrap; }
         .prog-entry-note { color: var(--text); flex: 1; line-height: 1.4; }
         .prog-del { background:none;border:none;color:#c7c7cc;cursor:pointer;font-size:14px;padding:0 2px;opacity:0;transition:opacity 0.12s;flex-shrink:0; }
+        .prog-edit { background:none;border:none;color:#888;cursor:pointer;font-size:11px;padding:1px 5px;opacity:0;transition:opacity 0.12s;flex-shrink:0;border:1px solid #ddd;border-radius:4px; }
         .prog-entry:hover .prog-del { opacity:1; }
+        .prog-entry:hover .prog-edit { opacity:1; }
+        .prog-entry.editing { background:#f0f6ff; border-radius:8px; padding:6px 8px; flex-wrap:wrap; gap:6px; }
+        .prog-entry.editing .prog-entry-date,
+        .prog-entry.editing .prog-entry-note { display:none; }
 
         .todo-prog-log {
             margin: 4px 0 2px 28px; border-left: 2px solid var(--border);
@@ -902,15 +907,41 @@ function deleteBigSub(taskId, bsId) {
 let editingTodo = null; // { taskId, bsId, tdId } when editing existing
 let tempProgEntries = [];
 
-function renderTempProg() {
+function renderTempProg(editIdx) {
     const el = document.getElementById('td_prog_list');
     if (!tempProgEntries.length) { el.innerHTML = ''; return; }
-    el.innerHTML = tempProgEntries.map((p, i) => `
-        <div class="prog-entry">
+    el.innerHTML = tempProgEntries.map((p, i) => {
+        if (i === editIdx) {
+            return `<div class="prog-entry editing" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <input type="date" id="prog_edit_date_${i}" value="${p.date}"
+                    style="flex:0 0 130px;padding:4px 8px;border:1.5px solid var(--accent);border-radius:6px;font-size:12px;font-family:inherit">
+                <input type="text" id="prog_edit_note_${i}" value="${esc(p.note)}"
+                    style="flex:1;min-width:120px;padding:4px 8px;border:1.5px solid var(--accent);border-radius:6px;font-size:12px;font-family:inherit">
+                <button class="btn btn-primary" style="font-size:11px;padding:3px 10px"
+                    onclick="saveProgEdit(${i})">确定</button>
+                <button class="btn btn-secondary" style="font-size:11px;padding:3px 8px"
+                    onclick="renderTempProg()">取消</button>
+                <button class="prog-del" style="opacity:1" onclick="removeTempProg(${i})">×</button>
+            </div>`;
+        }
+        return `<div class="prog-entry">
             <span class="prog-entry-date">${fmtDate(p.date)}</span>
             <span class="prog-entry-note">${esc(p.note)}</span>
+            <button class="prog-edit" onclick="renderTempProg(${i})">修改</button>
             <button class="prog-del" onclick="removeTempProg(${i})">×</button>
-        </div>`).join('');
+        </div>`;
+    }).join('');
+    if (editIdx !== undefined) {
+        const n = document.getElementById('prog_edit_note_'+editIdx);
+        if (n) { n.focus(); n.select(); }
+    }
+}
+function saveProgEdit(i) {
+    const date = document.getElementById('prog_edit_date_'+i).value;
+    const note = document.getElementById('prog_edit_note_'+i).value.trim();
+    if (!date || !note) return;
+    tempProgEntries[i] = { ...tempProgEntries[i], date, note };
+    renderTempProg();
 }
 
 function addProgEntry() {
