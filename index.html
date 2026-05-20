@@ -309,11 +309,19 @@
         }
         .skill-item:hover .ghost-del { opacity: 1; }
 
+        .reminder-date-group { margin-bottom: 10px; }
+        .reminder-date-label {
+            font-size: 11px; font-weight: 600; color: var(--sub);
+            padding: 2px 6px; margin-bottom: 4px;
+            display: flex; align-items: center; gap: 4px;
+        }
+        .reminder-date-label.today { color: var(--accent); }
         .reminder-item {
             display: flex; align-items: flex-start; gap: 8px;
             padding: 9px 11px; background: var(--bg);
-            border-radius: 9px; margin-bottom: 5px;
+            border-radius: 9px; margin-bottom: 4px;
         }
+        .reminder-item.today-item { border-left: 3px solid var(--accent); }
         .reminder-text { font-size: 13px; flex: 1; line-height: 1.5; }
         .reminder-item.done .reminder-text { text-decoration: line-through; color: var(--sub); }
 
@@ -488,7 +496,7 @@
         </div>
         <div class="panel-sec">
             <div class="panel-head">
-                重要提醒
+                每日待办
                 <button class="icon-btn sm" onclick="openReminderModal()">+</button>
             </div>
             <div id="reminderList"></div>
@@ -588,10 +596,10 @@
 <!-- Reminder modal -->
 <div class="overlay" id="reminderModal">
     <div class="modal">
-        <h3>添加重要提醒</h3>
+        <h3>添加待办事项</h3>
         <div class="fg">
             <label>提醒内容 *</label>
-            <textarea id="rm_text" placeholder="写下需要记住的事..."></textarea>
+            <textarea id="rm_text" placeholder="写下今天要做的事..."></textarea>
             <div class="err" id="rm_text_err">请输入提醒内容</div>
         </div>
         <div class="modal-foot">
@@ -1159,7 +1167,8 @@ function saveReminder() {
     const text = document.getElementById('rm_text').value.trim();
     if (!text) { showErr('rm_text_err'); document.getElementById('rm_text').focus(); return; }
     hideErr('rm_text_err');
-    db.reminders.push({ id:uid(), text, done:false });
+    const today = new Date().toISOString().slice(0,10);
+    db.reminders.push({ id:uid(), text, done:false, date: today });
     save(); closeModal('reminderModal'); renderReminders();
 }
 function toggleReminder(id) {
@@ -1173,13 +1182,31 @@ function deleteReminder(id) {
 }
 function renderReminders() {
     const el = document.getElementById('reminderList');
-    if (!db.reminders.length) { el.innerHTML='<div class="empty-hint">暂无提醒</div>'; return; }
-    el.innerHTML = db.reminders.map(r=>`
-        <div class="reminder-item${r.done?' done':''}">
-            <div class="todo-check${r.done?' done':''}" onclick="toggleReminder('${r.id}')" style="width:16px;height:16px;font-size:9px;margin-top:2px">${r.done?'✓':''}</div>
-            <div class="reminder-text">${esc(r.text)}</div>
-            <button class="ghost-del" onclick="deleteReminder('${r.id}')">×</button>
-        </div>`).join('');
+    if (!db.reminders.length) { el.innerHTML='<div class="empty-hint">暂无待办</div>'; return; }
+    const today = new Date().toISOString().slice(0,10);
+    // 按日期分组，today 放最前
+    const groups = {};
+    db.reminders.forEach(r => {
+        const d = r.date || today;
+        if (!groups[d]) groups[d] = [];
+        groups[d].push(r);
+    });
+    const sortedDates = Object.keys(groups).sort((a,b) => b.localeCompare(a));
+    el.innerHTML = sortedDates.map(date => {
+        const isToday = date === today;
+        const label = isToday ? '📅 今天' : fmtDate(date);
+        const items = groups[date].map(r => `
+            <div class="reminder-item${r.done?' done':''}${isToday?' today-item':''}">
+                <div class="todo-check${r.done?' done':''}" onclick="toggleReminder('${r.id}')"
+                    style="width:16px;height:16px;font-size:9px;margin-top:2px;flex-shrink:0">${r.done?'✓':''}</div>
+                <div class="reminder-text">${esc(r.text)}</div>
+                <button class="ghost-del" onclick="deleteReminder('${r.id}')">×</button>
+            </div>`).join('');
+        return `<div class="reminder-date-group">
+            <div class="reminder-date-label${isToday?' today':''}">${label}</div>
+            ${items}
+        </div>`;
+    }).join('');
 }
 
 // ── Modal helpers ──
