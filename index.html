@@ -978,7 +978,7 @@ function renderTempProg(editIdx) {
             <div style="display:flex;align-items:center;gap:6px;width:100%">
                 <span class="prog-entry-date">${fmtDate(p.date)}</span>
                 <span class="prog-entry-note" style="flex:1">${esc(p.note)}</span>
-                <label for="prog_file_input" class="prog-attach-btn" onmousedown="setPickIdx(${i})">附件</label>
+                <button class="prog-attach-btn" onclick="setPickIdx(${i});document.getElementById('prog_file_input').click()">附件</button>
                 <button class="prog-edit" onclick="renderTempProg(${i})">修改</button>
                 <button class="prog-del" onclick="removeTempProg(${i})">×</button>
             </div>
