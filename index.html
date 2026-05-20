@@ -398,7 +398,7 @@
         .prog-entry-note { color: var(--text); flex: 1; line-height: 1.4; }
         .prog-del { background:none;border:none;color:#c7c7cc;cursor:pointer;font-size:14px;padding:0 2px;opacity:0;transition:opacity 0.12s;flex-shrink:0; }
         .prog-edit { background:none;border:none;color:#888;cursor:pointer;font-size:11px;padding:1px 5px;opacity:0;transition:opacity 0.12s;flex-shrink:0;border:1px solid #ddd;border-radius:4px; }
-        .prog-attach-btn { background:none;border:1px solid #ddd;border-radius:4px;color:#888;cursor:pointer;font-size:11px;padding:1px 5px;opacity:0;transition:opacity 0.12s;flex-shrink:0; }
+        .prog-attach-btn { background:none;border:1px solid #ddd;border-radius:4px;color:#888;cursor:pointer;font-size:11px;padding:1px 5px;opacity:0;transition:opacity 0.12s;flex-shrink:0;user-select:none; }
         .prog-entry:hover .prog-del { opacity:1; }
         .prog-entry:hover .prog-edit { opacity:1; }
         .prog-entry:hover .prog-attach-btn { opacity:1; }
@@ -462,7 +462,7 @@
 
 <!-- Setup modal (shown when no token) -->
 <!-- 附件上传 input（必须预先存在于 DOM，WKWebView 不允许动态创建后 click） -->
-<input type="file" id="prog_file_input" accept="*/*" style="display:none">
+<input type="file" id="prog_file_input" accept="*/*" style="display:none" onchange="handleProgFileSelect(event)">
 
 <div class="overlay" id="setupModal">
     <div class="setup-modal">
@@ -978,7 +978,7 @@ function renderTempProg(editIdx) {
             <div style="display:flex;align-items:center;gap:6px;width:100%">
                 <span class="prog-entry-date">${fmtDate(p.date)}</span>
                 <span class="prog-entry-note" style="flex:1">${esc(p.note)}</span>
-                <button class="prog-attach-btn" onclick="pickAttachment(${i})">附件</button>
+                <label for="prog_file_input" class="prog-attach-btn" onmousedown="setPickIdx(${i})">附件</label>
                 <button class="prog-edit" onclick="renderTempProg(${i})">修改</button>
                 <button class="prog-del" onclick="removeTempProg(${i})">×</button>
             </div>
@@ -997,35 +997,38 @@ function saveProgEdit(i) {
     tempProgEntries[i] = { ...tempProgEntries[i], date, note };
     renderTempProg();
 }
-function pickAttachment(idx) {
+let _pickIdx = -1;
+function setPickIdx(idx) {
+    _pickIdx = idx;
+    // 重置 input，确保相同文件也能触发 change
     const inp = document.getElementById('prog_file_input');
-    inp.value = '';  // 重置，确保同一文件可再次选择
-    inp.onchange = e => {
-        const file = e.target.files[0];
-        if (!file) return;
-        if (file.size > 5 * 1024 * 1024) {
-            // 用内联提示代替 alert
-            const errEl = document.createElement('div');
-            errEl.textContent = '文件不能超过 5MB';
-            errEl.style.cssText = 'color:red;font-size:12px;padding:4px';
-            const list = document.getElementById('td_prog_list');
-            list.prepend(errEl);
-            setTimeout(() => errEl.remove(), 3000);
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = ev => {
-            if (!tempProgEntries[idx].attachments) tempProgEntries[idx].attachments = [];
-            tempProgEntries[idx].attachments.push({
-                name: file.name,
-                type: file.type,
-                data: ev.target.result
-            });
-            renderTempProg();
-        };
-        reader.readAsDataURL(file);
+    if (inp) inp.value = '';
+}
+function handleProgFileSelect(e) {
+    const file = e.target.files[0];
+    if (!file || _pickIdx < 0) return;
+    if (file.size > 5 * 1024 * 1024) {
+        const errEl = document.createElement('div');
+        errEl.textContent = '文件不能超过 5MB';
+        errEl.style.cssText = 'color:red;font-size:12px;padding:4px 0';
+        const list = document.getElementById('td_prog_list');
+        if (list) list.prepend(errEl);
+        setTimeout(() => errEl.remove(), 3000);
+        return;
+    }
+    const idx = _pickIdx;
+    const reader = new FileReader();
+    reader.onload = ev => {
+        if (!tempProgEntries[idx]) return;
+        if (!tempProgEntries[idx].attachments) tempProgEntries[idx].attachments = [];
+        tempProgEntries[idx].attachments.push({
+            name: file.name,
+            type: file.type,
+            data: ev.target.result
+        });
+        renderTempProg();
     };
-    inp.click();
+    reader.readAsDataURL(file);
 }
 function removeAttachment(progIdx, attIdx) {
     tempProgEntries[progIdx].attachments.splice(attIdx, 1);
