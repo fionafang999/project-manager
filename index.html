@@ -461,6 +461,9 @@
 </div>
 
 <!-- Setup modal (shown when no token) -->
+<!-- 附件上传 input（必须预先存在于 DOM，WKWebView 不允许动态创建后 click） -->
+<input type="file" id="prog_file_input" accept="*/*" style="display:none">
+
 <div class="overlay" id="setupModal">
     <div class="setup-modal">
         <div style="font-size:40px;margin-bottom:12px">🔑</div>
@@ -995,14 +998,19 @@ function saveProgEdit(i) {
     renderTempProg();
 }
 function pickAttachment(idx) {
-    const inp = document.createElement('input');
-    inp.type = 'file';
-    inp.accept = '*/*';
+    const inp = document.getElementById('prog_file_input');
+    inp.value = '';  // 重置，确保同一文件可再次选择
     inp.onchange = e => {
         const file = e.target.files[0];
         if (!file) return;
         if (file.size > 5 * 1024 * 1024) {
-            alert('文件不能超过 5MB');
+            // 用内联提示代替 alert
+            const errEl = document.createElement('div');
+            errEl.textContent = '文件不能超过 5MB';
+            errEl.style.cssText = 'color:red;font-size:12px;padding:4px';
+            const list = document.getElementById('td_prog_list');
+            list.prepend(errEl);
+            setTimeout(() => errEl.remove(), 3000);
             return;
         }
         const reader = new FileReader();
@@ -1011,7 +1019,7 @@ function pickAttachment(idx) {
             tempProgEntries[idx].attachments.push({
                 name: file.name,
                 type: file.type,
-                data: ev.target.result  // base64 data URL
+                data: ev.target.result
             });
             renderTempProg();
         };
