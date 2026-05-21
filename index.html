@@ -1093,24 +1093,34 @@ function saveTodo() {
     const title = document.getElementById('td_title').value.trim();
     if (!title) { showErr('td_title_err'); document.getElementById('td_title').focus(); return; }
     hideErr('td_title_err');
-    // capture any unsaved inline entry
-    const inlineDate = document.getElementById('td_prog_date').value;
+
+    // 进度记录：日期为空时自动补今天；只要 note 不为空就保存
+    const today = new Date().toISOString().slice(0,10);
+    const inlineDate = document.getElementById('td_prog_date').value || today;
     const inlineNote = document.getElementById('td_prog_note').value.trim();
-    if (inlineDate && inlineNote) tempProgEntries.push({ id: uid(), date: inlineDate, note: inlineNote });
-
-    const t = db.tasks.find(x => x.id===todoForTask);
-    if (!t) return;
-    const bs = (t.bigSubs||[]).find(x => x.id===todoForBigSub);
-    if (!bs) return;
-
-    if (editingTodo) {
-        const td = (bs.todos||[]).find(x => x.id===editingTodo.tdId);
-        if (td) { td.title = title; td.progress = tempProgEntries; }
-    } else {
-        if (!bs.todos) bs.todos = [];
-        bs.todos.push({ id: uid(), title, done: false, progress: tempProgEntries });
+    if (inlineNote) {
+        tempProgEntries.push({ id: uid(), date: inlineDate, note: inlineNote });
     }
-    save(); closeModal('todoModal'); renderTasks();
+
+    try {
+        const t = db.tasks.find(x => x.id===todoForTask);
+        if (!t) { closeModal('todoModal'); return; }
+        const bs = (t.bigSubs||[]).find(x => x.id===todoForBigSub);
+        if (!bs) { closeModal('todoModal'); return; }
+
+        if (editingTodo) {
+            const td = (bs.todos||[]).find(x => x.id===editingTodo.tdId);
+            if (td) { td.title = title; td.progress = JSON.parse(JSON.stringify(tempProgEntries)); }
+        } else {
+            if (!bs.todos) bs.todos = [];
+            bs.todos.push({ id: uid(), title, done: false, progress: JSON.parse(JSON.stringify(tempProgEntries)) });
+        }
+        save();
+    } catch(e) {
+        console.error('saveTodo error:', e);
+    }
+    closeModal('todoModal');
+    renderTasks();
 }
 
 function toggleTodo(taskId, bsId, tdId) {
